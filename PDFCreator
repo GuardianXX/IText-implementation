@@ -1,0 +1,157 @@
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.util.Log;
+import android.widget.Toast;
+
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+
+public class PDFCreator {
+
+    private final Context context;
+    private File archivo_pdf;
+    private Document documento;
+    PdfWriter escritor_pdf;
+    private Paragraph parrafo;
+    private final Font letra_titulo = new Font(Font.FontFamily.TIMES_ROMAN, 20, Font.BOLD);
+    private final Font letra_subtitulo = new Font(Font.FontFamily.TIMES_ROMAN, 18, Font.BOLD);
+    private final Font letra_texto = new Font(Font.FontFamily.TIMES_ROMAN, 12, Font.BOLD);
+    private Font letra_texto_resaltado = new Font(Font.FontFamily.TIMES_ROMAN, 15, Font.BOLD, BaseColor.RED);
+
+    public PDFCreator (Context context) {
+        this.context = context;
+    }
+
+    public void abrir_documento () {
+        crear_archivo();
+        try {
+            documento = new Document(PageSize.LETTER);
+            escritor_pdf = PdfWriter.getInstance(documento, new FileOutputStream(archivo_pdf));
+            documento.open();
+            Toast.makeText(context, "Documento generado correctamente", Toast.LENGTH_LONG).show();
+        }
+        catch (Exception e) {
+            Log.e("Abrir documento", e.toString());
+        }
+    }
+
+    private void crear_archivo () {
+        File carpeta = new File (Environment.getExternalStorageDirectory().toString(), "Reportes");
+        if (!carpeta.exists())
+            carpeta.mkdirs();
+        archivo_pdf = new File (carpeta, "Reporte de errores.pdf");
+    }
+
+    public void agregar_datos (String titulo, String sujeto, String autor) {
+        documento.addTitle(titulo);
+        documento.addSubject(sujeto);
+        documento.addAuthor(autor);
+    }
+
+    public void agregar_titulos (String titulo, String subtitulo, String fecha) {
+        try {
+            parrafo = new Paragraph();
+            agregar_textos_y_parrafos(new Paragraph(titulo, letra_titulo));
+            agregar_textos_y_parrafos(new Paragraph(subtitulo, letra_subtitulo));
+            agregar_textos_y_parrafos(new Paragraph("Generado el: " + fecha, letra_texto));
+            parrafo.setSpacingAfter(30);
+            documento.add(parrafo);
+        }
+        catch (Exception e) {
+            Log.e("Agregar título", e.toString());
+        }
+    }
+
+    public void agregar_parrafo_texto (String texto) {
+        try {
+            parrafo = new Paragraph(texto, letra_texto);
+            parrafo.setSpacingAfter(5);
+            parrafo.setSpacingBefore(5);
+        }
+        catch (Exception e) {
+            Log.e("Agregar texto", e.toString());
+        }
+    }
+
+    public void crear_tabla (String[]header, ArrayList<String[]>dias_de_la_semana) {
+        try {
+            parrafo = new Paragraph();
+            parrafo.setFont(letra_texto);
+            PdfPTable tabla = new PdfPTable(header.length);
+            tabla.setWidthPercentage(100);
+            tabla.setSpacingBefore(20);
+            tabla.setSpacingAfter(20);
+            PdfPCell celdas;
+            int Indice_C = 0;
+            while (Indice_C < header.length) {
+                celdas = new PdfPCell(new Phrase(header[Indice_C++], letra_subtitulo));
+                celdas.setHorizontalAlignment(Element.ALIGN_CENTER);
+                celdas.setBackgroundColor(BaseColor.LIGHT_GRAY);
+                tabla.addCell(celdas);
+            }
+
+            for (int Indice_R = 0; Indice_R < dias_de_la_semana.size(); Indice_R++) {
+                String[] row = dias_de_la_semana.get(Indice_R);
+                for (Indice_C = 0; Indice_C < header.length; Indice_C++) {
+                    celdas = new PdfPCell(new Phrase(row[Indice_C]));
+                    celdas.setHorizontalAlignment(Element.ALIGN_CENTER);
+                    celdas.setFixedHeight(40);
+                    tabla.addCell(celdas);
+                }
+            }
+
+            parrafo.add(tabla);
+            documento.add(parrafo);
+        }
+        catch (Exception e) {
+            Log.e("Crear tabla", e.toString());
+        }
+    }
+
+    private void agregar_textos_y_parrafos (Paragraph pequeno_parrafo) {
+        pequeno_parrafo.setAlignment(Element.ALIGN_CENTER);
+        parrafo.add(pequeno_parrafo);
+    }
+
+    public void abrir_app_externamente (Activity activity) {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+            if (archivo_pdf.exists()) {
+                Uri uri = Uri.fromFile(archivo_pdf);
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(uri, "application/pdf");
+                try {
+                    activity.startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.pdfviewer")));
+                    Toast.makeText(activity.getApplicationContext(), "No se pudo abrir el documento, descargue un gestos de PDF", Toast.LENGTH_LONG);
+                }
+            } else {
+                Toast.makeText(activity.getApplicationContext(), "No se generó ningpun archivo PDF, verifique...", Toast.LENGTH_LONG);
+            }
+        }
+        else {
+            Toast.makeText(activity.getApplicationContext(), "Documento generado correctamente", Toast.LENGTH_LONG);
+        }
+    }
+
+    public void cerrar_documento () {
+        documento.close();
+    }
+}
